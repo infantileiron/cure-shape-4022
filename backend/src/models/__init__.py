@@ -6,3 +6,4 @@ from .study import ShapeStudy
 from .run import ShapeRun
 from .review import ClusterReview
 from .report import Report
+from .backfill import BackfillBatch

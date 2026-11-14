@@ -11,3 +11,21 @@ export type Run={id:string;study_id:string;status:'queued'|'running'|'completed'
 export type Review={id:string;run_id:string;version:number;names:{cluster_id:string;name:string}[];note:string;decision:'accepted'|'needs_changes';author:string;created_at:string};
 export type Report={id:string;run_id:string;review_id:string;title:string;published_by:string;created_at:string};
 export type Audit={id:string;actor:string;action:string;status:number;created_at:string};
+export type PointSource={segment_id:string;batch_no:string;value:number};
+export type BackfillConflict={curve_id:string;point_index:number;existing_value:number;incoming_value:number;existing_sources:string[];incoming_segment_id:string;incoming_batch_no:string};
+export type BackfillConflictState={rejected_at:string;incoming_batch_no:string;incoming_segment_id:string;conflicts:BackfillConflict[]};
+export type BackfillMissing={curve_id:string;missing_indexes:number[]};
+export type BackfillSegment={segment_id:string;batch_no:string;curve_id:string;start_index:number;values:number[];received_at:string};
+export type BackfillBatch={
+ id:string;name:string;source:string;times:number[];
+ curves:{curve_id:string;label:string}[];
+ segments:Record<string,BackfillSegment>;
+ point_sources:Record<string,Record<string,PointSource[]>>;
+ conflict:BackfillConflictState|null;
+ status:'collecting'|'published';
+ dataset_id:string|null;parent_batch_id:string|null;
+ created_at:string;published_at:string|null;
+ missing:BackfillMissing[];
+ received_point_count:Record<string,number>;
+ segment_count:number;
+};

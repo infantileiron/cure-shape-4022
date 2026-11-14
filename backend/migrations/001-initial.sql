@@ -1,3 +1,5 @@
 -- Declarative schema source: src/models/*.py
 -- Initial startup uses SQLAlchemy metadata.create_all; no destructive migration or seed overwrite.
--- Six domain tables + users + audit_events; immutable snapshots and review versions.
+-- 曲线域：curve_datasets、backfill_batches（分段补传批次、片段与每点来源）；
+-- 归并域：alignment_policies、shape_studies、shape_runs、cluster_reviews、reports；
+-- 另有 users 与 audit_events；快照、复核版本与补传来源均不可变追加。

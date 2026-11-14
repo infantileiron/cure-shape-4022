@@ -45,6 +45,17 @@ docker compose exec backend python -m scripts.seed_demo
 
 六实体为 CurveDataset、AlignmentPolicy、ShapeStudy、ShapeRun、ClusterReview、Report，贯穿表、schema、service、route、前端 API 与页面。研究任务冻结数据/口径；运行结果持久化到 PostgreSQL JSON。复核每次新增不可变版本，必须覆盖当前所有簇；Report绑定最新接受复核ID。后续新复核不会改变旧CSV中的名称、版本和校验和。
 
+## 分段补传批次
+
+仪器常把同批养护曲线分段补传，整份导入接不住。`BackfillBatch` 先**预先登记曲线（curve_id/label）与同一64点等距时间轴**，此时没有任何读数；片段按曲线与采样序号 `start_index` 陆续归位，规则如下：
+
+- 乱序片段可直接接收，按序号落入64点时间轴；重复片段不增加读数。
+- 同点重叠且同值时保留**全部来源**（每次补传的 segment_id 与批次号都可追溯），读数仍只有一个；异值则**整次补传拒绝**，响应与页面指出每个冲突点（曲线、序号、已收值/被拒值及双方来源），已收数据不变，被拒片段不落任何点。
+- 未登记曲线、越过63号点、非有限值在接口层拒绝；不补零、不插值、不重采样。
+- 并发补传与发布在同一事务内对批次行加锁（`SELECT ... FOR UPDATE`）串行判定；仅当**全部预登记曲线齐点**（各64点）时才可发布，发布生成一份通过完整性校验的 `CurveDataset`，之后拒绝一切补传；重复发布返回同一曲线集。
+- 已发布批次可作为来源**继续归并**：续批必须沿用同一时间轴且预登记曲线与来源有交集，独立收集、独立发布，片段到达顺序不影响结果。
+- 页面「补传批次」用64格网格查看每条曲线的缺点、冲突点，点击任一点查看该点的全部来源片段；冲突与缺点在收数过程中持续可见。
+
 ## 技术与目录
 
 | 部分 | 技术 |
@@ -55,7 +66,7 @@ docker compose exec backend python -m scripts.seed_demo
 | 数据库 | PostgreSQL16 |
 | 容器 | 恰好 frontend/backend/worker/db/redis 五服务，全部健康检查 |
 
-`frontend/src` 按 api/stores/types/pages/components/hooks/router/utils/constants 分工，六领域页加登录，曲线图/口径条/簇清单跨页共享。`backend/src` 按 models/schemas/services/controllers/routes/middlewares/config/utils/constants 分工；`backend/scripts/seed_demo.py` 仅在自然键不存在时插入，连跑不覆盖编辑。`backend/migrations` 说明初始schema来源。测试、截图、日志和验收报告位于批根的 `test-artifacts/gb-2403`，源码中不混入测试产物。
+`frontend/src` 按 api/stores/types/pages/components/hooks/router/utils/constants 分工，七领域页（含补传批次）加登录，曲线图/口径条/簇清单跨页共享。`backend/src` 按 models/schemas/services/controllers/routes/middlewares/config/utils/constants 分工；`backend/scripts/seed_demo.py` 仅在自然键不存在时插入，连跑不覆盖编辑。`backend/migrations` 说明初始schema来源。测试、截图、日志和验收报告位于批根的 `test-artifacts/gb-2403`，源码中不混入测试产物；补传规则的端到端测试见该目录 `test_backfill.py`（SQLite 内存库，`python3 -I test_backfill.py`）。
 
 环境变量在 `.env.example`：COMPOSE_PROJECT_NAME=cure-shape，FRONTEND_PORT=18232，BACKEND_PORT=19232，DB_PORT=17732，SEED_DEMO=true，JWT_SECRET。容器内DATABASE_URL/REDIS_URL由compose注入。数据库、Redis和worker产物使用独立命名卷；Nginx `/api/` 代理FastAPI并处理SPA回落。开发时前端 `npm ci && npm run dev`，API `uvicorn src.main:app --host 0.0.0.0`，worker `python -m src.worker`，并配置可连接的DATABASE_URL/REDIS_URL。
 
